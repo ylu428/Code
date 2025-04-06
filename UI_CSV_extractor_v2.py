@@ -127,7 +127,7 @@ def save_to():
 
 # GUI setup
 app = tk.Tk()
-app.title("CSV Column Combiner with Lot ID")
+app.title("OCD raw data extractor")
 
 file_selector1 = FileSelector(app, "File 1")
 file_selector2 = FileSelector(app, "File 2")
