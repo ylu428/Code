@@ -43,7 +43,7 @@ def extract_columns(file1, file2, max_rows=None):
         messagebox.showerror("Error", str(e))
         return None
 
-def get_filename_and_length():
+def get_inputs():
     filename = filename_entry.get().strip()
     if not filename:
         filename = "combined"
@@ -56,11 +56,18 @@ def get_filename_and_length():
                 raise ValueError
         except ValueError:
             messagebox.showwarning("Invalid Length", "Please enter a valid positive integer.")
-            return filename, None, False
+            return filename, None, None, False
     else:
         length = None
 
-    return filename, length, True
+    lot_id = lotid_entry.get().strip()
+    return filename, length, lot_id, True
+
+def prepare_output(df, lot_id):
+    empty_rows = pd.DataFrame([[""] * df.shape[1]] * 3, columns=df.columns)
+    result = pd.concat([empty_rows, df], ignore_index=True)
+    result.iloc[0, 0] = f"Lot ID: {lot_id}" if lot_id else "Lot ID: (not specified)"
+    return result
 
 def save_same_location():
     path1 = file_selector1.get_path()
@@ -70,14 +77,15 @@ def save_same_location():
         messagebox.showwarning("Missing file", "Please select both files.")
         return
 
-    filename, length, valid = get_filename_and_length()
+    filename, length, lot_id, valid = get_inputs()
     if not valid:
         return
 
     result = extract_columns(path1, path2, max_rows=length)
     if result is not None:
+        final_output = prepare_output(result, lot_id)
         new_path = os.path.join(os.path.dirname(path1), f"{filename}.csv")
-        result.to_csv(new_path, index=False)
+        final_output.to_csv(new_path, index=False, header=False)
         messagebox.showinfo("Success", f"File saved to:\n{new_path}")
 
 def save_to():
@@ -88,23 +96,24 @@ def save_to():
         messagebox.showwarning("Missing file", "Please select both files.")
         return
 
-    filename, length, valid = get_filename_and_length()
+    filename, length, lot_id, valid = get_inputs()
     if not valid:
         return
 
     result = extract_columns(path1, path2, max_rows=length)
     if result is not None:
+        final_output = prepare_output(result, lot_id)
         initialfile = f"{filename}.csv"
         save_path = filedialog.asksaveasfilename(defaultextension=".csv",
                                                  filetypes=[("CSV files", "*.csv")],
                                                  initialfile=initialfile)
         if save_path:
-            result.to_csv(save_path, index=False)
+            final_output.to_csv(save_path, index=False, header=False)
             messagebox.showinfo("Success", f"File saved to:\n{save_path}")
 
 # GUI setup
 app = tk.Tk()
-app.title("CSV Column Combiner")
+app.title("CSV Column Combiner with Lot ID")
 
 file_selector1 = FileSelector(app, "File 1")
 file_selector2 = FileSelector(app, "File 2")
@@ -123,6 +132,13 @@ length_entry = tk.Entry(length_frame, width=10)
 length_entry.pack(side=tk.LEFT, padx=5)
 length_frame.pack(pady=5)
 
+# Lot ID entry
+lotid_frame = tk.Frame(app)
+tk.Label(lotid_frame, text="Lot ID:").pack(side=tk.LEFT)
+lotid_entry = tk.Entry(lotid_frame, width=30)
+lotid_entry.pack(side=tk.LEFT, padx=5)
+lotid_frame.pack(pady=5)
+
 # Buttons
 save_btn = tk.Button(app, text="Save (Same Location as File 1)", command=save_same_location)
 save_btn.pack(pady=5)
@@ -131,5 +147,3 @@ save_to_btn = tk.Button(app, text="Save To...", command=save_to)
 save_to_btn.pack(pady=5)
 
 app.mainloop()
-
-
