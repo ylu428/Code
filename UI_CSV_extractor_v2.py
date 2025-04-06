@@ -63,10 +63,24 @@ def get_inputs():
     lot_id = lotid_entry.get().strip()
     return filename, length, lot_id, True
 
-def prepare_output(df, lot_id):
-    empty_rows = pd.DataFrame([[""] * df.shape[1]] * 3, columns=df.columns)
-    result = pd.concat([empty_rows, df], ignore_index=True)
-    result.iloc[0, 0] = f"Lot ID: {lot_id}" if lot_id else "Lot ID: (not specified)"
+def prepare_output(df, lot_id, filename1, filename2):
+    # Remove extensions from filenames
+    name1 = os.path.splitext(os.path.basename(filename1))[0]
+    name2 = os.path.splitext(os.path.basename(filename2))[0]
+
+    # Define custom header
+    header = ["Location X", "Location Y", name1, name2]
+    # Create empty rows for shifting
+    empty_rows = pd.DataFrame([[""] * df.shape[1]] * 2, columns=df.columns)
+
+    # Build the final DataFrame with Lot ID and Header
+    lot_id_row = [f"Lot ID: {lot_id}" if lot_id else "Lot ID: (not specified)"] + [""] * (df.shape[1] - 1)
+    final_df = pd.DataFrame([lot_id_row], columns=df.columns)
+
+    # Add header and actual data
+    header_df = pd.DataFrame([header], columns=df.columns)
+    result = pd.concat([final_df, empty_rows, header_df, df], ignore_index=True)
+
     return result
 
 def save_same_location():
@@ -83,7 +97,7 @@ def save_same_location():
 
     result = extract_columns(path1, path2, max_rows=length)
     if result is not None:
-        final_output = prepare_output(result, lot_id)
+        final_output = prepare_output(result, lot_id, path1, path2)
         new_path = os.path.join(os.path.dirname(path1), f"{filename}.csv")
         final_output.to_csv(new_path, index=False, header=False)
         messagebox.showinfo("Success", f"File saved to:\n{new_path}")
@@ -102,7 +116,7 @@ def save_to():
 
     result = extract_columns(path1, path2, max_rows=length)
     if result is not None:
-        final_output = prepare_output(result, lot_id)
+        final_output = prepare_output(result, lot_id, path1, path2)
         initialfile = f"{filename}.csv"
         save_path = filedialog.asksaveasfilename(defaultextension=".csv",
                                                  filetypes=[("CSV files", "*.csv")],
