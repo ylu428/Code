@@ -47,39 +47,45 @@ def get_inputs():
     filename = filename_entry.get().strip()
     if not filename:
         filename = "combined"
+    try:
+        wafer_size = int(wafer_entry.get().strip())
 
-    length_text = length_entry.get().strip()
-    if length_text:
-        try:
-            length = int(length_text)
-            if length <= 0:
-                raise ValueError
-        except ValueError:
-            messagebox.showwarning("Invalid Length", "Please enter a valid positive integer.")
-            return filename, None, None, False
-    else:
-        length = None
+    except ValueError:
+        messagebox.showwarning("Invalid input", "Wafer sizemust be integers.")
+        return None
+    try:
+        num_measurements = int(measure_entry.get().strip())
+    except ValueError:
+        messagebox.showwarning("Invalid input", "Number of measurements must be an integer.")
+        return None
+
 
     lot_id = lotid_entry.get().strip()
-    return filename, length, lot_id, True
+    return filename, wafer_size, num_measurements, lot_id, True
 
-def prepare_output(df, lot_id, filename1, filename2):
+def prepare_output(df, lot_id, filename1, filename2, wafer_size, num_measurements):
     # Remove extensions from filenames
     name1 = os.path.splitext(os.path.basename(filename1))[0]
     name2 = os.path.splitext(os.path.basename(filename2))[0]
 
     # Define custom header
     header = ["X", "Y", name1, name2]
-    # Create empty rows for shifting
+    # Create the three special rows (as one-column DataFrames)
+    top_rows = pd.DataFrame([
+        [f"Wafer Size: {wafer_size} mm"],
+        [f"Number of Measurements: {num_measurements}"],
+        [f"Lot ID: {lot_id}" if lot_id else "Lot ID: (not specified)"]
+    ])
+
+    # Create header row and two empty rows with appropriate width
+    header_df = pd.DataFrame([header], columns=df.columns)
     empty_rows = pd.DataFrame([[""] * df.shape[1]] * 2, columns=df.columns)
 
-    # Build the final DataFrame with Lot ID and Header
-    lot_id_row = [f"Lot ID: {lot_id}" if lot_id else "Lot ID: (not specified)"] + [""] * (df.shape[1] - 1)
-    final_df = pd.DataFrame([lot_id_row], columns=df.columns)
+    # Final output
+    bottom_df = pd.concat([header_df, empty_rows, df], ignore_index=True)
 
-    # Add header and actual data
-    header_df = pd.DataFrame([header], columns=df.columns)
-    result = pd.concat([final_df, empty_rows, header_df, df], ignore_index=True)
+    # Combine top and bottom
+    result = pd.concat([top_rows, bottom_df], ignore_index=True)
 
     return result
 
@@ -91,13 +97,13 @@ def save_same_location():
         messagebox.showwarning("Missing file", "Please select both files.")
         return
 
-    filename, length, lot_id, valid = get_inputs()
+    filename, wafer_size, num_measurements, lot_id, valid = get_inputs()
     if not valid:
         return
 
-    result = extract_columns(path1, path2, max_rows=length)
+    result = extract_columns(path1, path2, max_rows=num_measurements)
     if result is not None:
-        final_output = prepare_output(result, lot_id, path1, path2)
+        final_output = prepare_output(result, lot_id, path1, path2, wafer_size, num_measurements)
         new_path = os.path.join(os.path.dirname(path1), f"{filename}.waf")
         final_output.to_csv(new_path, index=False, header=False)
         messagebox.showinfo("Success", f"File saved to:\n{new_path}")
@@ -110,13 +116,13 @@ def save_to():
         messagebox.showwarning("Missing file", "Please select both files.")
         return
 
-    filename, length, lot_id, valid = get_inputs()
+    filename, wafer_size, num_measurements, lot_id, valid = get_inputs()
     if not valid:
         return
 
-    result = extract_columns(path1, path2, max_rows=length)
+    result = extract_columns(path1, path2, max_rows=num_measurements)
     if result is not None:
-        final_output = prepare_output(result, lot_id, path1, path2)
+        final_output = prepare_output(result, lot_id, path1, path2, wafer_size, num_measurements)
         initialfile = f"{filename}.waf"
         save_path = filedialog.asksaveasfilename(defaultextension=".waf",
                                                  filetypes=[("CSV files", "*.waf")],
@@ -139,12 +145,21 @@ filename_entry = tk.Entry(filename_frame, width=30)
 filename_entry.pack(side=tk.LEFT, padx=5)
 filename_frame.pack(pady=5)
 
-# Data length entry
-length_frame = tk.Frame(app)
-tk.Label(length_frame, text="Number of Data Points to Copy:").pack(side=tk.LEFT)
-length_entry = tk.Entry(length_frame, width=10)
-length_entry.pack(side=tk.LEFT, padx=5)
-length_frame.pack(pady=5)
+# Wafer Size entry
+wafer_frame = tk.Frame(app)
+tk.Label(wafer_frame, text="Wafer Size (mm):").pack(side=tk.LEFT)
+wafer_entry = tk.Entry(wafer_frame, width=10)
+wafer_entry.insert(0, "300")
+wafer_entry.pack(side=tk.LEFT, padx=5)
+wafer_frame.pack(pady=5)
+
+# Combined entry for Number of Measurements
+measure_frame = tk.Frame(app)
+tk.Label(measure_frame, text="Number of Measurements:").pack(side=tk.LEFT)
+measure_entry = tk.Entry(measure_frame, width=10)
+measure_entry.insert(0, "49")  # default value
+measure_entry.pack(side=tk.LEFT, padx=5)
+measure_frame.pack(pady=5)
 
 # Lot ID entry
 lotid_frame = tk.Frame(app)
